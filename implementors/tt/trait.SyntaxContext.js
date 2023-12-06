@@ -1,0 +1,4 @@
+(function() {var implementors = {
+"base_db":[["impl SyntaxContext for <a class=\"struct\" href=\"base_db/span/struct.SyntaxContextId.html\" title=\"struct base_db::span::SyntaxContextId\">SyntaxContextId</a>"]],
+"mbe":[["impl <a class=\"trait\" href=\"mbe/trait.SyntaxContext.html\" title=\"trait mbe::SyntaxContext\">SyntaxContext</a> for <a class=\"struct\" href=\"mbe/struct.DummyTestSyntaxContext.html\" title=\"struct mbe::DummyTestSyntaxContext\">DummyTestSyntaxContext</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
