@@ -623,7 +623,7 @@ pub fn expr_tuple(elements: impl IntoIterator<Item = ast::Expr>) -> ast::Expr {
 pub fn expr_assignment(lhs: ast::Expr, rhs: ast::Expr) -> ast::Expr {
     expr_from_text(&format!("{lhs} = {rhs}"))
 }
-fn expr_from_text(text: &str) -> ast::Expr {
+pub fn expr_from_text(text: &str) -> ast::Expr {
     ast_from_text(&format!("const C: () = {text};"))
 }
 pub fn expr_let(pattern: ast::Pat, expr: ast::Expr) -> ast::LetExpr {
@@ -1115,12 +1115,13 @@ pub fn token_tree(
 }
 
 #[track_caller]
-fn ast_from_text<N: AstNode>(text: &str) -> N {
+pub fn ast_from_text<N: AstNode>(text: &str) -> N {
     let parse = SourceFile::parse(text);
     let node = match parse.tree().syntax().descendants().find_map(N::cast) {
         Some(it) => it,
         None => {
             let node = std::any::type_name::<N>();
+            dbg!(parse.tree().syntax());
             panic!("Failed to make ast node `{node}` from text {text}")
         }
     };

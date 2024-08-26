@@ -29,9 +29,11 @@ use span::{Span, SyntaxContextId, ROOT_ERASED_FILE_AST_ID};
 use stdx::TupleExt;
 use syntax::{
     algo::skip_trivia_token,
-    ast::{self, HasAttrs as _, HasGenericParams, HasLoopBody, IsString as _},
-    match_ast, AstNode, AstToken, Direction, SyntaxKind, SyntaxNode, SyntaxNodePtr, SyntaxToken,
-    TextRange, TextSize,
+    ast::{self, HasAttrs as _, HasGenericParams, HasLoopBody, IntNumber, IsString as _},
+    match_ast,
+    ted::{self, Element},
+    AstNode, AstToken, Direction, SyntaxKind, SyntaxNode, SyntaxNodePtr, SyntaxToken, TextRange,
+    TextSize,
 };
 
 use crate::{
@@ -255,6 +257,35 @@ impl<'db> SemanticsImpl<'db> {
         let tree = self.db.parse(file_id).tree();
         self.cache(tree.syntax().clone(), file_id.into());
         tree
+    }
+
+    pub fn parse_deal_with_the_into(
+        &self,
+        file_id: FileId,
+        interested_node: impl Fn(&SyntaxNode, bool) -> Option<SyntaxToken>,
+    ) -> (ast::SourceFile, Option<SyntaxToken>) {
+        let tree = self.db.parse(file_id).tree();
+        let tree = tree.clone_for_update();
+
+        let interested = interested_node(&tree.syntax(), false);
+
+        let interested = if let Some(node) = interested {
+            if let Some(to_repl) = node.parent().and_then(|p| p.parent()).and_then(|p| p.parent()) {
+                let new_code: ast::MacroCall = ast::make::ast_from_text("TypeB::from(a)");
+                dbg!(&to_repl);
+
+                ted::replace(to_repl, new_code.clone_for_update().syntax());
+                interested_node(&tree.syntax(), true)
+            } else {
+                Some(node)
+            }
+        } else {
+            None
+        };
+
+        self.cache(tree.syntax().clone(), file_id.into());
+
+        (tree, interested)
     }
 
     pub fn parse_or_expand(&self, file_id: HirFileId) -> SyntaxNode {
@@ -1297,6 +1328,14 @@ impl<'db> SemanticsImpl<'db> {
     ) -> Option<SourceAnalyzer> {
         let _p = tracing::span!(tracing::Level::INFO, "Semantics::analyze_impl");
         let node = self.find_file(node);
+
+        // let cloned_value = node.value.clone_for_update();
+        // //let method_call: ast::Expr = ast::make::ast_from_text(&format!("TypeB::from(a)"));
+        // let method_call: ast::Expr = ast::make::expr_from_text(&format!("<_>::from(a)"));
+        // dbg!(&offset, &node.value, &method_call.syntax());
+        // ted::replace(cloned_value, method_call.syntax().clone_for_update());
+        // //let node = node.with_value(&cloned_value);
+        // dbg!(&node);
 
         let container = self.with_ctx(|ctx| ctx.find_container(node))?;
 

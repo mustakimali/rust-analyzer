@@ -593,6 +593,7 @@ impl NameRefClass {
         let _p = tracing::span!(tracing::Level::INFO, "classify_name_ref", ?name_ref).entered();
 
         let parent = name_ref.syntax().parent()?;
+        dbg!(&name_ref, &parent);
 
         if let Some(record_field) = ast::RecordExprField::for_field_name(name_ref) {
             if let Some((field, local, _)) = sema.resolve_record_field(&record_field) {
@@ -616,12 +617,15 @@ impl NameRefClass {
                     }
                 }
             }
-            return sema.resolve_path(&path).map(Into::into).map(NameRefClass::Definition);
+            dbg!("<_>::from() reaches here");
+            dbg!(&path);
+            return dbg!(sema.resolve_path(&path)).map(Into::into).map(NameRefClass::Definition);
         }
 
         match_ast! {
             match parent {
                 ast::MethodCallExpr(method_call) => {
+                    dbg!("a.into() reaches here");
                     sema.resolve_method_call_fallback(&method_call)
                         .map(|it| {
                             it.map_left(Definition::Function)

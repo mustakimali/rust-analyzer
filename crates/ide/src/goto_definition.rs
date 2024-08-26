@@ -1,4 +1,4 @@
-use std::mem::discriminant;
+use std::{borrow::BorrowMut, mem::discriminant, ops::Add};
 
 use crate::{
     doc_links::token_as_doc_comment, navigation_target::ToNav, FilePosition, NavigationTarget,
@@ -31,24 +31,46 @@ pub(crate) fn goto_definition(
     db: &RootDatabase,
     FilePosition { file_id, offset }: FilePosition,
 ) -> Option<RangeInfo<Vec<NavigationTarget>>> {
+    let targets = goto_definition_internal(db, FilePosition { file_id, offset })?;
+
+    if let Some(nt) = targets.info.first() {
+        if nt.description.clone().unwrap_or("".to_string()).as_str() == "fn into(self) -> U" {
+            if let Some(focus) = nt.focus_range {}
+        }
+    }
+
+    Some(targets)
+}
+
+fn goto_definition_internal(
+    db: &RootDatabase,
+    FilePosition { file_id, offset }: FilePosition,
+) -> Option<RangeInfo<Vec<NavigationTarget>>> {
     let sema = &Semantics::new(db);
-    let file = sema.parse(file_id).syntax().clone();
-    let original_token = pick_best_token(file.token_at_offset(offset), |kind| match kind {
-        IDENT
-        | INT_NUMBER
-        | LIFETIME_IDENT
-        | T![self]
-        | T![super]
-        | T![crate]
-        | T![Self]
-        | COMMENT => 4,
-        // index and prefix ops
-        T!['['] | T![']'] | T![?] | T![*] | T![-] | T![!] => 3,
-        kind if kind.is_keyword() => 2,
-        T!['('] | T![')'] => 2,
-        kind if kind.is_trivia() => 0,
-        _ => 1,
-    })?;
+    let (parsed, original_token) = sema.parse_deal_with_the_into(file_id, |file, m| {
+        let offset = if m { offset } else { offset };
+        let original_token = pick_best_token(file.token_at_offset(offset), |kind| match kind {
+            IDENT
+            | INT_NUMBER
+            | LIFETIME_IDENT
+            | T![self]
+            | T![super]
+            | T![crate]
+            | T![Self]
+            | COMMENT => 4,
+            // index and prefix ops
+            T!['['] | T![']'] | T![?] | T![*] | T![-] | T![!] => 3,
+            kind if kind.is_keyword() => 2,
+            T!['('] | T![')'] => 2,
+            kind if kind.is_trivia() => 0,
+            _ => 1,
+        });
+
+        dbg!(original_token)
+    });
+
+    //let file = parsed.syntax().clone();
+    let original_token = original_token?;
     if let Some(doc_comment) = token_as_doc_comment(&original_token) {
         return doc_comment.get_definition_with_descend_at(sema, offset, |def, _, link_range| {
             let nav = def.try_to_nav(db)?;
@@ -1255,6 +1277,63 @@ trait Iterator {
 fn g() -> <() as Iterator<Item$0 = ()>>::Item {}
 "#,
         );
+    }
+
+    #[test]
+    fn goto_def_for_into_to_from_impls() {
+        check(
+            r#"
+pub trait From<T>: Sized {
+    fn from(value: T) -> Self;
+}
+pub trait Into<T>: Sized {
+    fn into(self) -> T;
+}
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+{
+    fn into(self) -> U {
+        U::from(self)
+    }
+}
+
+struct TypeA;
+struct TypeB;
+
+impl From<TypeA> for TypeB {
+    fn from(_: TypeA) -> TypeB {
+     //^^^^
+        TypeB
+    }
+}
+            
+fn g() {
+    let a = TypeA;
+    let aa = TypeA;
+    let b: TypeB = a.into$0();
+    //let b: TypeB = TypeB::from(a);
+}
+"#,
+        );
+    }
+
+    // REAL RUST CODE
+
+    struct TypeA;
+    struct TypeB;
+
+    impl From<TypeA> for TypeB {
+        fn from(_: TypeA) -> TypeB {
+            TypeB
+        }
+    }
+
+    fn g() {
+        let a = TypeA;
+        //let b = a.into();
+        let b = <_>::from(a);
+        let b: TypeB = b;
     }
 
     #[test]

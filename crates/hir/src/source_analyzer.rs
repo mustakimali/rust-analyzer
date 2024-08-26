@@ -289,6 +289,9 @@ impl SourceAnalyzer {
         db: &dyn HirDatabase,
         call: &ast::MethodCallExpr,
     ) -> Option<Either<Function, Field>> {
+        dbg!(call);
+        //let new_call: ast::Expr = ast::make::ast_from_text("aa::into()");
+        //let call = &new_call;
         let expr_id = self.expr_id(db, &call.clone().into())?;
         let inference_result = self.infer.as_ref()?;
         match inference_result.method_resolution(expr_id) {
